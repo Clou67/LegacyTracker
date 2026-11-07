@@ -143,4 +143,26 @@ QUESTS = [
 ]
 UNUSED_QUESTS = [(58, "Defeat Shadow Minion (unused: never given by any script)")]
 
-OVERWORLD_EGG_TARGET = 40   # the category's rule; the game places 41 (see RESEARCH.md)
+OVERWORLD_EGG_TARGET = 40   # the category's current rule; 41 are obtainable (see RESEARCH.md)
+
+# ---- The Hole (level 0x19): 28 holes in one map, each an object group that is
+# spawned only when you come down that hole. Leaving the map auto-saves it and
+# writes every saved object of the other, unloaded groups as gone, so only the
+# FIRST hole you ever enter keeps its egg. One Hole egg is obtainable per file.
+HOLE_LEVEL = 0x19
+HOLE_EGG_GROUPS = {   # object group -> (hole number, where its entrance is)
+    22: (21, "Hermit Cave (Dragon Mouth Cave)"),
+    23: (22, "Wilderness, Forgotten Worlds (chest)"),
+    26: (25, "Dragon Shores / Dragon Shores Cave"),
+    27: (26, "Wilderness, Ice boss area"),
+    28: (27, "Wilderness, Avalar"),
+}
+
+# ---- eggs handed over by scripts (GiveOneItem 25), with the quest flag set alongside
+NPC_EGGS = [
+    ("Laird (Suntan Lotion)", 0x13),
+    ("Aqua (put out fires)", 0x131),
+    ("Dirt (build altar)", 0x83),
+    ("Lucia (zap chickens)", 0xDB),
+]
+EGGS_OBTAINABLE = 36 + 1 + len(NPC_EGGS)   # placed outside the Hole + 1 Hole egg + NPC eggs = 41

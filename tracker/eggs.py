@@ -11,6 +11,7 @@ Eggs picked up in the level you are standing in show as "pending" until then.
 """
 import struct
 
+from . import gamedata as G
 from .levels_data import LEVELS
 
 N_LEVELS = 0x29
@@ -89,9 +90,38 @@ def from_stream(stream):
     return res
 
 
-def summarize(level_states, live_level=None):
+def hole_status(st, taken, current_hole=None):
+    """The Hole: only the first hole entered keeps its egg (see gamedata.HOLE_EGG_GROUPS).
+    current_hole: the hole the hero is in now (live), else None."""
+    eggs = [e for e in LEVELS[G.HOLE_LEVEL][4]]
+    egg_holes = {h: w for h, w in G.HOLE_EGG_GROUPS.values()}
+    if taken:
+        return "got", 1, "Hole egg collected."
+    if st is None:
+        return "unknown", 0, "No save data for The Hole yet."
+    here = [(g, k) for g, k, *_ in eggs if st.get((g, k), True)]
+    if current_hole is not None and len(here) == len(eggs):
+        if current_hole in egg_holes:
+            return "inside", 0, f"You're in hole {current_hole}, an egg hole: grab the egg before you leave!"
+        return "danger", 0, (f"You're in hole {current_hole}, which has NO egg. Leaving now wipes every Hole egg "
+                             "for this file.")
+    if len(here) == len(eggs):
+        return "open", 0, ("Not entered yet. The first hole you go down is the only one that keeps its egg: "
+                           "enter an egg hole first (Hermit Cave is the early one).")
+    if len(here) == 1:
+        hole, where = G.HOLE_EGG_GROUPS[here[0][0]]
+        return "waiting", 0, f"The egg is still in hole {hole} ({where}): go back down that hole for it."
+    if not here:
+        return "gone", 0, ("The Hole has been entered and no Hole egg is left. If you didn't pick one up, "
+                           "it is lost for this file. (Watched live, the tracker marks the pickup itself.)")
+    return "open", 0, "Several Hole eggs are still there."
+
+
+def summarize(level_states, live_level=None, vars_=None, hole_taken=False):
+    current_hole = vars_[0x184] if (vars_ is not None and live_level == G.HOLE_LEVEL) else None
     """Per-level egg list. level_states: from_stream(); live_level: the
-    level the hero is in now."""
+    level the hero is in now; vars_: the story flags (for NPC eggs);
+    hole_taken: the tracker saw an egg picked up inside The Hole."""
     levels = []
     total = got = 0
     for idx, file, name, layout, eggs in LEVELS:
@@ -102,13 +132,29 @@ def summarize(level_states, live_level=None):
         for g, k, kind, x, y in eggs:
             eid = f"{file}:{g}:{k}"
             state = "unknown" if st is None else ("left" if st.get((g, k), True) else "got")
-            rows.append(dict(id=eid, kind=kind, x=x, y=y, state=state))
-        n_got = sum(r["state"] == "got" for r in rows)
-        levels.append(dict(level=idx, file=file, name=name, eggs=rows, got=n_got, total=len(rows),
-                           here=idx == live_level, known=st is not None))
-        total += len(rows)
-        got += n_got
-    return dict(levels=levels, got=got, total=total)
+            row = dict(id=eid, kind=kind, x=x, y=y, state=state)
+            if idx == G.HOLE_LEVEL:
+                row["hole"], row["where"] = G.HOLE_EGG_GROUPS[g]
+                row["state"] = "left" if state == "left" else ("unknown" if state == "unknown" else "gone")
+            rows.append(row)
+        lv = dict(level=idx, file=file, name=name, eggs=rows, here=idx == live_level, known=st is not None)
+        if idx == G.HOLE_LEVEL:
+            status, n_got, msg = hole_status(st, hole_taken, current_hole)
+            lv.update(got=n_got, total=1, hole=status, note=msg)
+        else:
+            lv.update(got=sum(r["state"] == "got" for r in rows), total=len(rows))
+        levels.append(lv)
+        total += lv["total"]
+        got += lv["got"]
+    # eggs NPCs hand over
+    rows = []
+    for who, flag in G.NPC_EGGS:
+        state = "unknown" if vars_ is None else ("got" if vars_[flag] else "left")
+        rows.append(dict(id="npc:" + who, kind="npc", name=who, state=state))
+    n = sum(r["state"] == "got" for r in rows)
+    levels.append(dict(level=None, file="npc", name="Given by NPCs", eggs=rows, got=n, total=len(rows),
+                       here=False, known=vars_ is not None))
+    return dict(levels=levels, got=got + n, total=total + len(rows))
 
 
 def egg_ids_for_level(idx):

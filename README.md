@@ -5,7 +5,8 @@ game's memory while you play, either in **melonDS** or in the **projShadow PC
 port** (`spShadowLegacy.exe`), and shows the 100% rules live:
 
 * every quest (58), split into to do / active / done
-* every overworld egg, level by level (41 in the game: 22 loose, 19 in chests)
+* every egg, level by level: 41 obtainable (36 placed, 1 from The Hole, 4 from NPCs)
+* The Hole's one-egg trap: it warns you live if you're in a hole without an egg
 * each upgrade tier (wallet, butterfly bottle, mushroom bag, keychain)
 * ability levels, hero level and XP
 
@@ -40,6 +41,14 @@ quests) no such flag is known. Those count as done once the tracker has seen
 them active and then cleared, which it remembers in `tracker_history.json`.
 They are tagged `seen` in the list. Reading a save file can't show these 8
 unless the tracker watched them happen.
+
+## The Hole
+
+Only the first hole you ever go down keeps its egg (details in
+[research/RESEARCH.md](research/RESEARCH.md#the-hole-why-only-one-egg)). For
+100%, make your first hole one of the five egg holes. Hermit Cave (the Dragon
+Mouth Cave) is the early one. The tracker shows The Hole as one egg, and
+shows a red warning while you're inside a hole with no egg.
 
 ## How it works
 

@@ -71,9 +71,88 @@ Each overworld egg is a **level object**, not a story flag:
   (+0x0A, +0x10 or +0x16; 19 of them).**
 
 That makes **41 egg objects in 23 levels** (`tracker/levels_data.py`, made by
-`research/extract_eggs.py`). The rule says 40. The extra one is probably
-Kaitlin's lost egg, which you have to give back. Comparing against the route's
-Eggs sheet will confirm this.
+`research/extract_eggs.py`). 5 of them are in The Hole (next section), and
+only one of those can ever be collected.
+
+Four more eggs are handed over by NPCs (script `GiveOneItem 25`):
+
+| NPC | Quest | Flag set alongside |
+|---|---|---|
+| Laird | Retrieve lotion from Laird's room | 0x13 |
+| Aqua | Put out fires for Aqua | 0x131 |
+| Dirt | Build altar for Dirt | 0x83 |
+| Lucia | Zap chickens for Lucia | 0xDB |
+
+### Totals, and where the route's "40" comes from
+
+| | Eggs |
+|---|---|
+| Placed outside The Hole | 36 |
+| The Hole (5 placed, only 1 obtainable) | 1 |
+| Given by NPCs | 4 |
+| **Obtainable on one file** | **41** |
+| Existing in the game data | 45 |
+
+The route's Eggs sheet lists 40: the 36 placed eggs plus the 4 NPC eggs. It
+matches every map except The Hole: Dragonfly Dojo, Dragon Village, Dragon
+Shores, Savannah, Treetops, Lost Fleet and Moleville match egg for egg, and
+the remaining areas match in total. (The route's "Dragon Mouth Cave" is
+`HermitCave`, and "outside Sensei's house" is `HermitHouse`.) **The 41st egg
+is the one Hole egg.**
+
+## The Hole: why only one egg
+
+The Hole (level 0x19, `Hole.app`) is a single map holding **28 holes**. Each
+hole is one object group with its own enemies, gates and items. The holes are
+entered from all over the world: a `WarpToMap` script command (opcode 85)
+sends you to map 0x19 and stores the hole number in `g_ScriptVars[0x184]`. A
+script in `Hole.app` then compares 0x184 against each hole number and spawns
+that hole's group (hole *n* → group *n* + 1).
+
+Every other map loads all of its object groups when you enter it.
+`Map_InitAppearances` (Map1.c) has a special case for level 0x19: it loads only
+the shared groups 0 and 1, and the one hole's group is spawned by that script.
+
+When you leave any map, the game auto-saves it (`Map_Exit` → `SaveGame_Save`).
+`Appearances_WriteGroup` writes one bit per saved object: 1 if the object's
+actor exists, 0 if not. It doesn't care whether a group was never loaded. So
+when you leave The Hole, every saved object of the 27 holes you aren't in is
+written as **gone**. The next time it loads them (`Appearances_LoadGroup`), the
+game sees a 0 and doesn't spawn them. Whichever hole you enter first is the
+only one that keeps its contents.
+
+| Hole | Group | Entrance (map with the `WarpToMap`) | Egg |
+|---|---|---|---|
+| 21 | 22 | Hermit Cave (Dragon Mouth Cave) | loose |
+| 22 | 23 | Wilderness, Forgotten Worlds | in a chest |
+| 25 | 26 | Dragon Shores, Dragon Shores Cave | loose |
+| 26 | 27 | Wilderness, Ice boss area (both versions) | loose |
+| 27 | 28 | Wilderness, Avalar | loose |
+
+The other 23 holes have no egg. Consequences:
+
+* **Exactly one Hole egg can be collected, and only if the first hole you ever
+  go down is one of the five above.** Hermit Cave (hole 21) is the early one.
+* Entering any other hole first (and leaving) loses all five for that file.
+  That matches the in-game observation: "after you collect one egg from the
+  Hole, no hole ever has an egg again".
+* If you enter an egg hole and leave without the egg, it stays: that hole's
+  group was loaded, so its egg is saved as still there. You can go back down
+  the same hole for it.
+* The same happens to everything else saved in the holes (chests, breakables),
+  not just eggs.
+
+This comes from the code and data. It still needs checking on a fresh file:
+(1) enter Hermit Cave's hole first, take the egg, then check that the
+Dragon Shores hole is empty; (2) on another file, enter a hole with no egg
+first, then check that every egg hole is empty.
+
+How the tracker handles it: it counts The Hole as one egg. Reading the save
+(or RAM) gives "not entered yet" (all 5 still there), "the egg is still in
+hole *n*" (one left), or "gone" (none left). When it watches live, it records
+an egg picked up inside The Hole, so it can tell "taken" apart from "lost". It
+also reads 0x184 while you're in The Hole and warns you if you're in a hole
+without an egg before anything has been taken.
 
 ### How the game remembers them (your byte-array hunch, almost)
 
@@ -118,8 +197,9 @@ game.
 
 ## Open questions
 
-* Which of the 41 egg objects is the one the rule leaves out (probably
-  Kaitlin's). Check against the route's Eggs sheet.
+* Confirm The Hole behaviour in game (tests above), and check whether the
+  `WarpToMap` entries with hole number 0 (Boat, Titan's house, Hermit House,
+  DR North) are real hole entrances or another use of the command.
 * Confirming the per-level save layout against a real save: it is so far
   only tested on data written by the tracker's own copy of the game's writer.
 * Each ability's real maximum. The tracker assumes 3, and 4 for Tail

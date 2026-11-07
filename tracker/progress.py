@@ -57,6 +57,13 @@ class History:
                     json.dump(self.data, f, indent=1)
                 os.replace(tmp, self.path)
 
+    def write(self):
+        if self.path:
+            tmp = self.path + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(self.data, f, indent=1)
+            os.replace(tmp, self.path)
+
     def reset(self, run):
         self.data.pop(run, None)
         if self.path:
@@ -108,7 +115,13 @@ def evaluate(snap, history=None, run="default"):
             states = E.from_stream(snap.stream)
         except (struct.error, IndexError):
             states = {}
-    per_level = E.summarize(states, snap.level)
+    hole_key = "hole-egg:" + run
+    if history is not None and snap.level == G.HOLE_LEVEL and snap.pending > 0:
+        if not history.data.get(hole_key):
+            history.data[hole_key] = True
+            history.write()
+    hole_taken = bool(history and history.data.get(hole_key))
+    per_level = E.summarize(states, snap.level, v, hole_taken)
     for lv in per_level["levels"]:
         if lv["here"]:
             lv["pending"] = snap.pending
@@ -146,7 +159,8 @@ def evaluate(snap, history=None, run="default"):
         quests=quests,
         quests_done=n_done,
         quests_total=len(quests),
-        eggs=dict(held=eggs_held, got=per_level["got"] + snap.pending, placed=per_level["total"],
+        eggs=dict(held=eggs_held, got=per_level["got"] + (0 if snap.level == G.HOLE_LEVEL else snap.pending),
+                  obtainable=per_level["total"], placed=per_level["total"],
                   pending=snap.pending,
                   target=G.OVERWORLD_EGG_TARGET, levels=per_level["levels"],
                   known=bool(states)),
@@ -164,7 +178,7 @@ def checklist(r):
     abil_done = sum(a["level"] >= a["max"] for a in r["abilities"])
     return [
         dict(rule="All quests", have=r["quests_done"], need=r["quests_total"]),
-        dict(rule="40 overworld eggs", have=min(r["eggs"]["got"], r["eggs"]["target"]), need=r["eggs"]["target"]),
+        dict(rule="All eggs (41 obtainable; rules say 40)", have=r["eggs"]["got"], need=r["eggs"]["obtainable"]),
         dict(rule="All upgrade tiers bought", have=sum(sum(u["tiers"]) for u in r["upgrades"]),
              need=sum(len(u["tiers"]) for u in r["upgrades"])),
         dict(rule="Max upgrades (top tier only)", have=sum(u["maxed"] for u in r["upgrades"]),

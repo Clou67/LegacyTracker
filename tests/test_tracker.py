@@ -127,7 +127,7 @@ class Eggs(unittest.TestCase):
             open(p, "wb").write(img)
             (_, snap), = savefile.read_save(p)
         r = progress.evaluate(snap)
-        expect = sum(1 for e in gone if e[0] != 1)
+        expect = sum(1 for e in gone if e[0] not in (1, G.HOLE_LEVEL))   # Hole eggs don't count one by one
         self.assertEqual(r["eggs"]["got"], expect)
         lv = {l["level"]: l for l in r["eggs"]["levels"]}
         self.assertFalse(lv[1]["known"])          # Bear Forest not visited in this save
@@ -137,4 +137,29 @@ class Eggs(unittest.TestCase):
     def test_bad_stream_is_ignored(self):
         hdr, v, inv, ab = make_state()
         r = progress.evaluate(progress.Snapshot(hdr, v, inv, ab, stream=b"\x00" * 40))
-        self.assertEqual(r["eggs"]["got"], 0)
+        self.assertEqual(r["eggs"]["got"], 4)        # only the NPC eggs (all quests done here)
+        self.assertEqual(r["eggs"]["obtainable"], 41)
+
+    def hole(self, gone, level=None, cur=0, pending=0, history=None):
+        from tracker.levels_data import LEVELS
+        hole_eggs = [(G.HOLE_LEVEL, g, k) for g, k, *_ in LEVELS[G.HOLE_LEVEL][4]]
+        hdr, v, inv, ab = make_state(quests_done=False)
+        v[0x184] = cur
+        stream = savefile.build_stream(v, inv, ab, {hole_eggs[i] for i in gone})
+        r = progress.evaluate(progress.Snapshot(hdr, v, inv, ab, stream=stream, level=level, pending=pending),
+                              history, "r")
+        return [l for l in r["eggs"]["levels"] if l["level"] == G.HOLE_LEVEL][0]
+
+    def test_hole(self):
+        self.assertEqual(self.hole([])["hole"], "open")
+        h = self.hole([0, 1, 3, 4])                      # first hole entered was #25 (index 2), egg left
+        self.assertEqual((h["hole"], h["total"]), ("waiting", 1))
+        self.assertIn("hole 25", h["note"])
+        self.assertEqual(self.hole([0, 1, 2, 3, 4])["hole"], "gone")
+        self.assertEqual(self.hole([], level=G.HOLE_LEVEL, cur=3)["hole"], "danger")   # hole 3 has no egg
+        self.assertEqual(self.hole([], level=G.HOLE_LEVEL, cur=21)["hole"], "inside")
+        with tempfile.TemporaryDirectory() as d:
+            h = progress.History(os.path.join(d, "h.json"))
+            self.hole([], level=G.HOLE_LEVEL, cur=21, pending=1, history=h)   # picked it up live
+            got = self.hole([0, 1, 2, 3, 4], history=progress.History(os.path.join(d, "h.json")))
+            self.assertEqual((got["hole"], got["got"]), ("got", 1))
