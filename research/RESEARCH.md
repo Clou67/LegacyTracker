@@ -1,8 +1,7 @@
 # How Spyro: Shadow Legacy tracks 100% progress
 
 Sources: the projShadow decompilation (function and variable names, file
-comments) and the game's own data, read out of the USA ROM (`ASSE`) with
-`research/extract.py`. Every address below is a DS main-RAM address. The
+comments) and the game's own data, read out of the USA ROM (`ASSE`). Every address below is a DS main-RAM address. The
 projShadow PC port maps DS memory at the same addresses.
 
 ## Where progress lives
@@ -36,7 +35,7 @@ AddCounter12F         <- +1 egg
 SaveGame
 ```
 
-`tracker/gamedata.py` lists each quest's start and done flags.
+`desktop/data_gen.go` lists each quest's start and done flags.
 
 ### Rescue quests count, they don't flag
 
@@ -109,8 +108,7 @@ Each overworld egg is a **level object**, not a story flag:
   25 at +8 (22 of them), and type-6 chests with item 25 in a drop slot
   (+0x0A, +0x10 or +0x16; 19 of them).**
 
-That makes **41 egg objects in 23 levels** (`tracker/levels_data.py`, made by
-`research/extract_eggs.py`). 5 of them are in The Hole (next section), and
+That makes **41 egg objects in 23 levels** (`desktop/data_gen.go`). 5 of them are in The Hole (next section), and
 only one of those can ever be collected.
 
 Four more eggs are handed over by NPCs (script `GiveOneItem 25`):

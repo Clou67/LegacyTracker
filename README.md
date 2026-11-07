@@ -10,7 +10,7 @@ port** (`spShadowLegacy.exe`), and shows the 100% rules live:
 * each upgrade tier (wallet, butterfly bottle, mushroom bag, keychain)
 * ability levels, hero level and XP
 
-It needs only Python 3.8+ (64-bit) and nothing else to install.
+
 
 ## Desktop app (Windows)
 
@@ -26,36 +26,7 @@ nothing to install. Double-click it.
 It keeps `tracker_history.json` next to itself (quests and the Hole egg it has seen done live).
 `SSLTracker.exe -text -save FILE` prints the same report in a console.
 
-Build it yourself with `desktop/build.sh` (needs only Go). It's a port of the Python tracker, and the tests
-check that both give identical reports on real saves.
-
-## Python version (browser overlay, e.g. for OBS)
-
-```sh
-python -m tracker              # start melonDS or the PC port first, then this
-```
-
-Open http://localhost:8765, or add it to OBS as a **Browser Source**. Add
-`?transparent=1&hidedone=1` to the URL to get a see-through background and to
-hide finished quests.
-
-| Option | |
-|---|---|
-| `--save FILE [--slot N]` | read a save file (melonDS `.sav`, the PC port's `spyro.sav`) instead of the running game; it refreshes whenever the file changes |
-| `--text` | print to the console instead of serving the page (`--save FILE --text --once` prints once) |
-| `--pid N` | pick the emulator process yourself |
-| `--run NAME` | name for this run's quest history (see below); use a new name for each attempt, or `--reset-history` |
-
-On Windows, `run_tracker.bat` starts it. On Linux, reading another program's
-memory may need `sudo sysctl kernel.yama.ptrace_scope=0`.
-
-## How quests are read
-
-The game only marks a quest while it is **active**, then clears the mark.
-Whether a quest is finished comes from a separate story flag, or for the
-"Rescue N …" quests from a rescue counter reaching its target. That works
-from a save file too. One quest (Kaitlin's eggs) has neither: it counts as
-done once it was started and its mark cleared (tagged `inferred`).
+Build it yourself with `desktop/build.sh` (needs only Go).
 
 ## The Hole
 
@@ -68,12 +39,11 @@ shows a red warning while you're inside a hole with no egg.
 ## How it works
 
 See [research/RESEARCH.md](research/RESEARCH.md) for where the game keeps each
-piece of progress and how that was found. `research/extract.py` re-derives the
-quest data from your own ROM. The tracker uses no game code or data, only
+piece of progress and how that was found. The tracker uses no game code or data, only
 addresses and flag numbers.
 
 ## Tests
 
 ```sh
-python -m unittest discover tests        # SSL_ROM=path/to/rom.nds also checks the memory signatures
+cd desktop && go test .
 ```

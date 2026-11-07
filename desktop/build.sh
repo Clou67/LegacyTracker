@@ -3,7 +3,6 @@
 #   desktop/build.sh            -> dist/SSLTracker.exe
 set -e
 cd "$(dirname "$0")"
-python3 gen_data.py && gofmt -w data_gen.go
 go vet . && GOOS=windows go vet .
 go test .
 mkdir -p ../dist
