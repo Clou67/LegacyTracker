@@ -21,14 +21,9 @@ nothing to install. Double-click it.
 * **File > Open save file...**: reads a melonDS `.sav` or the PC port's `spyro.sav`. It updates by itself
   whenever the game saves, which happens on every map change.
 * **View**: *Hide finished*, *Compact* (just the checklist and eggs, good next to the game), *Always on top*.
-* **View > Game theme**: the XP screen background and the game's own pixel font. The first time,
-  it asks for your `Spyro - Shadow Legacy (USA).nds`; it reads the picture and fonts from that file every
-  time it starts. Nothing from the game is stored in the tracker. Use *Choose ROM for the theme...* if
-  you move the ROM.
 * Scroll with the mouse wheel if the window is smaller than the list.
 
-It keeps `tracker_history.json` (quests and the Hole egg it has seen done live) and
-`tracker_settings.json` (your View choices and where your ROM is) next to itself.
+It keeps `tracker_history.json` next to itself (quests and the Hole egg it has seen done live).
 `SSLTracker.exe -text -save FILE` prints the same report in a console.
 
 Build it yourself with `desktop/build.sh` (needs only Go). It's a port of the Python tracker, and the tests

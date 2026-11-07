@@ -61,8 +61,6 @@ var (
 	pSetBkMode           = gdi32.NewProc("SetBkMode")
 	pGetDeviceCaps       = gdi32.NewProc("GetDeviceCaps")
 	pGetOpenFileNameW    = comdlg32.NewProc("GetOpenFileNameW")
-	pStretchDIBits       = gdi32.NewProc("StretchDIBits")
-	pSetStretchBltMode   = gdi32.NewProc("SetStretchBltMode")
 	pGetModuleHandleW    = syscall.NewLazyDLL("kernel32.dll").NewProc("GetModuleHandleW")
 )
 
@@ -84,8 +82,6 @@ const (
 	idCompact = 203
 	idReset   = 301
 	idAbout   = 302
-	idTheme   = 204
-	idROM     = 205
 )
 
 type rect struct{ L, T, R, B int32 }
@@ -165,8 +161,6 @@ type appState struct {
 	hwnd     uintptr
 	hist     *History
 	wake     chan struct{}
-	theme    *gameTheme
-	cfg      settings
 }
 
 var app = &appState{wake: make(chan struct{}, 1)}
@@ -359,13 +353,8 @@ func paint(hwnd uintptr) {
 	p.dy = app.scroll
 	app.mu.Unlock()
 
-	var h int
-	if th := app.theme; th != nil && app.cfg.Theme {
-		h = paintThemed(mdc, int(W), int(H), p.scale, th, r, status, hide, compact, p.dy)
-	} else {
-		lw := int(float64(W) / p.scale) // logical width
-		h = draw(p, r, status, hide, compact, lw)
-	}
+	lw := int(float64(W) / p.scale) // logical width
+	h := draw(p, r, status, hide, compact, lw)
 
 	app.mu.Lock()
 	app.contentH = h
@@ -383,73 +372,20 @@ func paint(hwnd uintptr) {
 	}
 }
 
-// paintThemed draws the window into a pixel buffer at a whole-number scale
-// (so the game's pixel fonts stay sharp) and stretches it onto the DC.
-func paintThemed(dc uintptr, W, H int, scale float64, th *gameTheme, r *Result, status string, hide, compact bool, dy int) int {
-	k := int(scale + 0.5)
-	if k < 1 {
-		k = 1
-	}
-	w, h := (W+k-1)/k, (H+k-1)/k
-	c := newFBCanvas(w, h, th, int(float64(dy)*scale)/k)
-	ch := draw(c, r, status, hide, compact, w)
-	type bmiHeader struct {
-		Size                          uint32
-		Width, Height                 int32
-		Planes, BitCount              uint16
-		Compression, SizeImage        uint32
-		XPels, YPels, ClrUsed, ClrImp int32
-	}
-	bi := bmiHeader{Width: int32(w), Height: -int32(h), Planes: 1, BitCount: 32}
-	bi.Size = uint32(unsafe.Sizeof(bi))
-	pSetStretchBltMode.Call(dc, 3) // COLORONCOLOR: keep the pixels crisp
-	pStretchDIBits.Call(dc, 0, 0, uintptr(w*k), uintptr(h*k), 0, 0, uintptr(w), uintptr(h),
-		uintptr(unsafe.Pointer(&c.img.pix[0])), uintptr(unsafe.Pointer(&bi)), 0, 0x00CC0020)
-	return int(float64(ch) * float64(k) / scale)
-}
-
-// pickROM asks for the ROM (if ask, or none is set), loads the theme from it and
-// turns the theme on. Returns false if there is no usable ROM.
-func pickROM(hwnd uintptr, ask bool) bool {
-	path := app.cfg.ROM
-	if ask || path == "" {
-		path = openDialog(hwnd, "Nintendo DS ROM (*.nds)\x00*.nds\x00All files\x00*.*\x00",
-			"Choose your Spyro: Shadow Legacy (USA) ROM for the game theme")
-		if path == "" {
-			return false
-		}
-	}
-	th, err := loadTheme(path)
-	if err != nil {
-		pMessageBoxW.Call(hwnd, uintptr(unsafe.Pointer(u16p("Can't use that ROM for the theme:\n\n"+err.Error()))),
-			uintptr(unsafe.Pointer(u16p("Game theme"))), 0x30)
-		return false
-	}
-	app.mu.Lock()
-	app.theme, app.cfg.ROM, app.cfg.Theme = th, path, true
-	app.mu.Unlock()
-	app.cfg.save()
-	return true
-}
-
 // ---------------------------------------------------------------- window
 
 var menuView uintptr
 
 func openSaveDialog(hwnd uintptr) string {
-	return openDialog(hwnd, "Save files (*.sav)\x00*.sav\x00All files\x00*.*\x00", "Open a Spyro: Shadow Legacy save file")
-}
-
-func openDialog(hwnd uintptr, filterSpec, title string) string {
 	buf := make([]uint16, 1024)
-	filter := utf16z(filterSpec)
+	filter := utf16z("Save files (*.sav)\x00*.sav\x00All files\x00*.*\x00")
 	ofn := openFileName{
 		StructSize: uint32(unsafe.Sizeof(openFileName{})),
 		Owner:      hwnd,
 		Filter:     &filter[0],
 		File:       &buf[0],
 		MaxFile:    uint32(len(buf)),
-		Title:      u16p(title),
+		Title:      u16p("Open a Spyro: Shadow Legacy save file"),
 		Flags:      0x00001000 | 0x00000800 | 0x00080000 | 0x8, // FILEMUSTEXIST | PATHMUSTEXIST | EXPLORER | NOCHANGEDIR
 	}
 	r, _, _ := pGetOpenFileNameW.Call(uintptr(unsafe.Pointer(&ofn)))
@@ -521,17 +457,13 @@ func wndProc(hwnd, m, wp, lp uintptr) (ret uintptr) {
 		case idHide:
 			app.mu.Lock()
 			app.hide = !app.hide
-			app.cfg.Hide = app.hide
 			check(idHide, app.hide)
 			app.mu.Unlock()
-			app.cfg.save()
 		case idCompact:
 			app.mu.Lock()
 			app.compact = !app.compact
-			app.cfg.Compact = app.compact
 			check(idCompact, app.compact)
 			app.mu.Unlock()
-			app.cfg.save()
 		case idTop:
 			app.mu.Lock()
 			app.top = !app.top
@@ -540,25 +472,8 @@ func wndProc(hwnd, m, wp, lp uintptr) (ret uintptr) {
 				after = ^uintptr(0) // HWND_TOPMOST (-1)
 			}
 			check(idTop, app.top)
-			app.cfg.Top = app.top
 			app.mu.Unlock()
-			app.cfg.save()
 			pSetWindowPos.Call(hwnd, after, 0, 0, 0, 0, 0x0001|0x0002|0x0010)
-		case idTheme:
-			if app.theme == nil {
-				if !pickROM(hwnd, app.cfg.ROM == "") {
-					break
-				}
-			} else {
-				app.mu.Lock()
-				app.cfg.Theme = !app.cfg.Theme
-				app.mu.Unlock()
-			}
-			check(idTheme, app.cfg.Theme && app.theme != nil)
-			app.cfg.save()
-		case idROM:
-			pickROM(hwnd, true)
-			check(idTheme, app.cfg.Theme && app.theme != nil)
 		case idReset:
 			r, _, _ := pMessageBoxW.Call(hwnd, uintptr(unsafe.Pointer(u16p("Forget the quests and the Hole egg this tracker has seen being done live?\n\n(Only needed when starting a new run with the same save slot.)"))),
 				uintptr(unsafe.Pointer(u16p("Reset run history"))), 0x4|0x30)
@@ -595,13 +510,6 @@ func runGUI() {
 	runtime.LockOSThread()
 	pSetProcessDPIAware.Call()
 	app.hist = LoadHistory(historyPath())
-	app.cfg = loadSettings()
-	app.hide, app.compact, app.top = app.cfg.Hide, app.cfg.Compact, app.cfg.Top
-	if app.cfg.ROM != "" {
-		if th, err := loadTheme(app.cfg.ROM); err == nil {
-			app.theme = th
-		}
-	}
 	if *flagSave != "" {
 		app.savePath, app.slot = *flagSave, *flagSlot
 	}
@@ -627,9 +535,6 @@ func runGUI() {
 	pAppendMenuW.Call(menuView, 0, idHide, uintptr(unsafe.Pointer(u16p("&Hide finished"))))
 	pAppendMenuW.Call(menuView, 0, idCompact, uintptr(unsafe.Pointer(u16p("&Compact (checklist and eggs only)"))))
 	pAppendMenuW.Call(menuView, 0, idTop, uintptr(unsafe.Pointer(u16p("Always on &top"))))
-	pAppendMenuW.Call(menuView, 0x800, 0, 0)
-	pAppendMenuW.Call(menuView, 0, idTheme, uintptr(unsafe.Pointer(u16p("&Game theme (XP screen and font, from your ROM)"))))
-	pAppendMenuW.Call(menuView, 0, idROM, uintptr(unsafe.Pointer(u16p("Choose &ROM for the theme..."))))
 	help, _, _ := pCreatePopupMenu.Call()
 	pAppendMenuW.Call(help, 0, idAbout, uintptr(unsafe.Pointer(u16p("&About"))))
 	pAppendMenuW.Call(menu, 0x10, file, uintptr(unsafe.Pointer(u16p("&File"))))
@@ -645,13 +550,6 @@ func runGUI() {
 		0x00CF0000|0x10000000, // WS_OVERLAPPEDWINDOW | WS_VISIBLE
 		0x80000000, 0x80000000, uintptr(1180*sc), uintptr(960*sc), 0, menu, inst, 0)
 	app.hwnd = hwnd
-	check(idHide, app.hide)
-	check(idCompact, app.compact)
-	check(idTop, app.top)
-	check(idTheme, app.cfg.Theme && app.theme != nil)
-	if app.top {
-		pSetWindowPos.Call(hwnd, ^uintptr(0), 0, 0, 0, 0, 0x0001|0x0002|0x0010)
-	}
 	pShowWindow.Call(hwnd, 5)
 	pUpdateWindow.Call(hwnd)
 
