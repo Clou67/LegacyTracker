@@ -1,7 +1,7 @@
 //go:build windows
 
 // Reading the game's RAM out of melonDS or the projShadow PC port (Windows).
-// Same method as tracker/memory.py: find the DS main RAM block by two pieces
+// Find the DS main RAM block by two pieces
 // of the game's code, then read DS addresses relative to it.
 package main
 

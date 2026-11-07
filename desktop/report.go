@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// TextReport prints a result the same way as `python -m tracker --text`.
+// TextReport prints a result as plain text (the -text option).
 func TextReport(r *Result) string {
 	var o []string
 	o = append(o, "== "+r.Source)

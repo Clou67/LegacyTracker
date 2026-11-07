@@ -1,6 +1,5 @@
 // The tracker's logic: turns the game's saved data into 100% progress.
-// A line-for-line port of tracker/progress.py, tracker/eggs.py and
-// tracker/savefile.py; see research/RESEARCH.md for what everything means.
+// See research/RESEARCH.md for what everything means.
 package main
 
 import (
