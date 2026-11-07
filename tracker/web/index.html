@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shadow Legacy 100% Tracker</title>
+<style>
+  :root { --bg:#14111c; --panel:#1e1a2a; --line:#342d47; --text:#ece8f5; --dim:#8f87a6;
+          --done:#7ddc8a; --active:#f2c14e; --todo:#4a4360; --accent:#b48cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.35 "Segoe UI",system-ui,sans-serif; }
+  body.transparent { background:transparent; }
+  header { display:flex; align-items:baseline; gap:12px; padding:10px 14px 6px; }
+  h1 { font-size:15px; margin:0; letter-spacing:.04em; color:var(--accent); }
+  #status { color:var(--dim); font-size:12px; }
+  main { display:grid; grid-template-columns:minmax(260px,1fr) minmax(300px,1.4fr); gap:10px; padding:0 14px 14px; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  h2 { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--dim); margin:0 0 8px; font-weight:600; }
+  .rule { display:grid; grid-template-columns:1fr auto; gap:2px 8px; margin-bottom:8px; }
+  .rule .n { font-variant-numeric:tabular-nums; color:var(--dim); }
+  .rule.ok .n, .rule.ok .t { color:var(--done); }
+  .bar { grid-column:1/-1; height:5px; background:var(--todo); border-radius:3px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--accent); }
+  .rule.ok .bar i { background:var(--done); }
+  .big { font-size:26px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .sub { color:var(--dim); font-size:12px; }
+  .row { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
+  .pips { letter-spacing:2px; font-family:monospace; }
+  .pip-on { color:var(--done); } .pip-off { color:var(--todo); }
+  .area { margin-top:6px; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+  .q { display:flex; gap:6px; padding:1px 0; align-items:baseline; }
+  .q .dot { width:8px; height:8px; border-radius:50%; flex:none; background:var(--todo); transform:translateY(-1px); }
+  .q.done .dot { background:var(--done); } .q.active .dot { background:var(--active); }
+  .q.started .dot { background:var(--active); opacity:.5; }
+  .q.done .name { color:var(--dim); }
+  .q .tag { font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:3px; padding:0 3px; }
+  .cols { columns:2; column-gap:16px; }
+  .grp { break-inside:avoid; }
+  .cols .grp:first-child .area { margin-top:0; }
+  .hidedone .q.done { display:none; }
+  .controls { margin-left:auto; display:flex; gap:10px; color:var(--dim); font-size:12px; }
+  .controls label { cursor:pointer; }
+  #wait { padding:40px 14px; color:var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>SHADOW LEGACY 100%</h1><span id="status">connecting...</span>
+  <div class="controls">
+    <label><input type="checkbox" id="hidedone"> hide finished quests</label>
+    <label><input type="checkbox" id="transp"> transparent</label>
+  </div>
+</header>
+<div id="wait" hidden></div>
+<main id="app" hidden>
+  <div>
+    <section id="check"><h2>100% checklist</h2><div id="rules"></div></section>
+    <section style="margin-top:10px"><h2>Level &amp; eggs</h2>
+      <div class="row"><div><div class="big" id="lvl"></div><div class="sub" id="xp"></div></div>
+        <div style="text-align:right"><div class="big" id="eggs"></div><div class="sub" id="eggsub"></div></div></div>
+      <div class="row sub"><span>Gems</span><span id="gems"></span></div>
+    </section>
+    <section style="margin-top:10px"><h2>Upgrades</h2><div id="upgrades"></div></section>
+    <section style="margin-top:10px"><h2>Abilities</h2><div id="abilities"></div></section>
+  </div>
+  <section id="questbox"><h2 id="qtitle">Quests</h2><div class="cols" id="quests"></div></section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const params = new URLSearchParams(location.search);
+function pref(id, key) {
+  const box = $(id);
+  let v = params.has(key) ? params.get(key) !== "0" : null;
+  if (v === null) { try { v = localStorage.getItem(key) === "1"; } catch (e) { v = false; } }
+  box.checked = v;
+  const apply = () => { document.body.classList.toggle(key, box.checked);
+                        try { localStorage.setItem(key, box.checked ? "1" : "0"); } catch (e) {} };
+  box.onchange = apply; apply();
+}
+pref("hidedone", "hidedone"); pref("transp", "transparent");
+
+const pips = (arr) => arr.map(on => `<span class="${on ? 'pip-on' : 'pip-off'}">${on ? '■' : '□'}</span>`).join('');
+let version = -1;
+function render(r) {
+  if (r.status !== "live" && r.status !== "save") {
+    $("app").hidden = true; $("wait").hidden = false;
+    $("wait").textContent = r.message || "Waiting for the game..."; $("status").textContent = r.status; return;
+  }
+  $("app").hidden = false; $("wait").hidden = true;
+  $("status").textContent = (r.status === "live" ? "● live: " : "save: ") + r.source;
+  $("rules").innerHTML = r.checklist.map(c => {
+    const ok = c.have >= c.need, pct = Math.min(100, 100 * c.have / c.need);
+    return `<div class="rule ${ok ? 'ok' : ''}"><span class="t">${esc(c.rule)}</span><span class="n">${c.have}/${c.need}</span><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  }).join('');
+  const L = r.level;
+  $("lvl").textContent = "Lv " + L.level;
+  $("xp").textContent = L.next_xp ? `${L.xp.toLocaleString()} / ${L.next_xp.toLocaleString()} XP` : `${L.xp.toLocaleString()} XP (max)`;
+  const E = r.eggs;
+  $("eggs").textContent = `${E.overworld}/${E.overworld_target}`;
+  $("eggsub").textContent = `overworld eggs (${E.total} total, ${E.from_quests} from quests)`;
+  $("gems").textContent = r.gems.toLocaleString();
+  $("upgrades").innerHTML = r.upgrades.map(u =>
+    `<div class="row"><span>${esc(u.name)}</span><span><span class="pips">${pips(u.tiers)}</span> <span class="sub">${u.capacity}/${u.max_capacity}</span></span></div>`).join('');
+  $("abilities").innerHTML = r.abilities.map(a =>
+    `<div class="row"><span>${esc(a.name)}</span><span class="pips">${pips(Array.from({length:a.max}, (_, i) => i < a.level))}</span></div>`).join('');
+  $("qtitle").textContent = `Quests ${r.quests_done}/${r.quests_total}`;
+  const groups = new Map();
+  for (const q of r.quests) { if (!groups.has(q.area)) groups.set(q.area, []); groups.get(q.area).push(q); }
+  let html = '';
+  for (const [area, qs] of groups) {
+    html += `<div class="grp"><div class="area">${esc(area)}</div>`;
+    for (const q of qs) {
+      const tags = (q.egg ? '<span class="tag">egg</span>' : '') +
+                   (q.how === 'seen' || q.how === 'inferred' ? `<span class="tag" title="no completion flag known; ${q.how === 'seen' ? 'seen active, then cleared' : 'started, then cleared'}">${q.how}</span>` : '');
+      html += `<div class="q ${q.state}"><span class="dot"></span><span class="name">${esc(q.name)}</span>${tags}</div>`;
+    }
+    html += '</div>';
+  }
+  $("quests").innerHTML = html;
+}
+async function poll() {
+  try {
+    const r = await (await fetch("/state", {cache: "no-store"})).json();
+    if (r.version !== version) { version = r.version; render(r); }
+  } catch (e) { $("status").textContent = "tracker not running"; }
+  setTimeout(poll, 500);
+}
+poll();
+</script>
+</body>
+</html>
