@@ -3,28 +3,28 @@
 package main
 
 const (
-	DsMain = 0x2000000
-	DsMainSize = 0x400000
-	AddrCurrentSlot = 0x20bf6a0
-	AddrSlotHeaders = 0x20ebc40
-	AddrScriptVars = 0x20d9f9c
-	AddrInventory = 0x20def74
-	AddrAbilities = 0x20ebce4
-	AddrSaveStream = 0x20ebbc8
-	AddrGroupTable = 0x20d9f90
-	AddrCurrentMap = 0x20df128
-	HdrXp = 0x8
-	HdrLevelIndex = 0x12
-	MaxLevel = 0x19
-	InvGems = 0x11c
-	InvUpgrades = 0x11e
-	InvKeys = 0x12b
-	InvEggs = 0x12e
-	InvRewards = 0x12f
-	QuestMarkerBase = 0x1c2
-	DefaultAbilityMax = 0x3
+	DsMain             = 0x2000000
+	DsMainSize         = 0x400000
+	AddrCurrentSlot    = 0x20bf6a0
+	AddrSlotHeaders    = 0x20ebc40
+	AddrScriptVars     = 0x20d9f9c
+	AddrInventory      = 0x20def74
+	AddrAbilities      = 0x20ebce4
+	AddrSaveStream     = 0x20ebbc8
+	AddrGroupTable     = 0x20d9f90
+	AddrCurrentMap     = 0x20df128
+	HdrXp              = 0x8
+	HdrLevelIndex      = 0x12
+	MaxLevel           = 0x19
+	InvGems            = 0x11c
+	InvUpgrades        = 0x11e
+	InvKeys            = 0x12b
+	InvEggs            = 0x12e
+	InvRewards         = 0x12f
+	QuestMarkerBase    = 0x1c2
+	DefaultAbilityMax  = 0x3
 	OverworldEggTarget = 0x28
-	HoleLevel = 0x19
+	HoleLevel          = 0x19
 	KaitlinEggReturned = 0x32
 )
 

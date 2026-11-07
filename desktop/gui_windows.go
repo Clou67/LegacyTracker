@@ -142,7 +142,7 @@ type openFileName struct {
 	FlagsEx       uint32
 }
 
-func u16p(s string) *uint16 { p, _ := syscall.UTF16PtrFromString(s); return p }
+func u16p(s string) *uint16 { return &utf16z(s)[0] }
 
 // ---------------------------------------------------------------- state
 
@@ -180,8 +180,24 @@ func (a *appState) source() (string, int) {
 	return a.savePath, a.slot
 }
 
-// worker: reads the game or the save file and evaluates it
+// worker: reads the game or the save file and evaluates it. If something
+// unexpected goes wrong, it logs it, shows it in the window and starts over.
 func worker() {
+	for {
+		func() {
+			defer func() {
+				if e := recover(); e != nil {
+					p := logCrash(e)
+					app.set(nil, fmt.Sprintf("Error: %v (details in %s)", e, filepath.Base(p)))
+					time.Sleep(2 * time.Second)
+				}
+			}()
+			workerLoop()
+		}()
+	}
+}
+
+func workerLoop() {
 	var mem *GameMemory
 	lastKey, lastSave := "", ""
 	var lastMod time.Time
@@ -302,7 +318,7 @@ func (p *painter) text(x, y, w int, s string, c uintptr, size int, bold bool, fl
 	pSelectObject.Call(p.dc, p.font(size, bold))
 	pSetTextColor.Call(p.dc, c)
 	r := rect{p.px(x), p.px(y - p.dy), p.px(x + w), p.px(y - p.dy + 2000)}
-	ws, _ := syscall.UTF16FromString(s)
+	ws := utf16z(s)
 	if flags&dtWordBrk != 0 {
 		m := r
 		pDrawTextW.Call(p.dc, uintptr(unsafe.Pointer(&ws[0])), uintptr(len(ws)-1), uintptr(unsafe.Pointer(&m)), flags|dtNoPrefix|dtCalcRect)
@@ -362,7 +378,7 @@ var menuView uintptr
 
 func openSaveDialog(hwnd uintptr) string {
 	buf := make([]uint16, 1024)
-	filter, _ := syscall.UTF16FromString("Save files (*.sav)\x00*.sav\x00All files\x00*.*\x00")
+	filter := utf16z("Save files (*.sav)\x00*.sav\x00All files\x00*.*\x00")
 	ofn := openFileName{
 		StructSize: uint32(unsafe.Sizeof(openFileName{})),
 		Owner:      hwnd,
@@ -387,7 +403,13 @@ func check(id int, on bool) {
 	pCheckMenuItem.Call(menuView, uintptr(id), f)
 }
 
-func wndProc(hwnd, m, wp, lp uintptr) uintptr {
+func wndProc(hwnd, m, wp, lp uintptr) (ret uintptr) {
+	defer func() {
+		if e := recover(); e != nil {
+			showError(hwnd, e)
+			ret = 0
+		}
+	}()
 	switch m {
 	case wmPaint:
 		paint(hwnd)
@@ -473,8 +495,15 @@ func wndProc(hwnd, m, wp, lp uintptr) uintptr {
 		pPostQuitMessage.Call(0)
 		return 0
 	}
-	ret, _, _ := pDefWindowProcW.Call(hwnd, m, wp, lp)
+	ret, _, _ = pDefWindowProcW.Call(hwnd, m, wp, lp)
 	return ret
+}
+
+// showError reports an unexpected error instead of letting the program vanish.
+func showError(hwnd uintptr, e interface{}) {
+	log := logCrash(e)
+	text := fmt.Sprintf("Something went wrong:\n\n%v\n\nThe tracker keeps running. Details were saved to:\n%s\n\nPlease send that file over.", e, log)
+	pMessageBoxW.Call(hwnd, uintptr(unsafe.Pointer(&utf16z(text)[0])), uintptr(unsafe.Pointer(u16p("Shadow Legacy Tracker"))), 0x30)
 }
 
 func runGUI() {
