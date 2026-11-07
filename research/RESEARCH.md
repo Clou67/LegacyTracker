@@ -268,3 +268,20 @@ All quests were matched by name against the route's quest list:
   game has two Shadow Minion quests: the ice minion (1st boss) and one that
   is handed out in Savannah and finished by the fire minion (2nd boss). The
   third "Defeat Shadow Minion" text is never used.
+
+## Graphics used by the desktop theme
+
+The desktop tracker's "Game theme" loads these from the user's own ROM at
+run time. They are never stored in the repository or the program.
+
+* `B_Stats_BKG.bin`: the pause menu's status (XP) page background
+  (`StatusMenu_Enter` loads resource 0x179). It's a BG blob (`BG_LoadBlob`,
+  BG2.c): flags 0xF9 = 256-colour palette, map, tiles, 8 bpp, tiles packed
+  with the game's own compressor (kind 3, `Unpack_Data` at 0x02000DF4; the
+  native version is `N_Unpack_Data` in projShadow `pc/src/game_asm.c`). It is
+  32×28 tiles (256×224 px).
+* Fonts (`g_FontFiles`, `Font_Load` in Font.c): `drift8psa.bin` (8 px),
+  `hachipochi12p.bin` (12 px), `GoblinBold15_White.bin` (14 px),
+  `KataFont.bin`. Each holds u16 first/last character, the height, and
+  big-endian offsets to a glyph offset table, a width table and 4-bit
+  pixels stored column by column.
