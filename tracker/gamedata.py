@@ -76,11 +76,14 @@ DEFAULT_ABILITY_MAX = 3
 # out of the level scripts (*.app files) and are listed here as `done`. `start`
 # flags are set when the quest is handed out. Where no done flag is known the
 # tracker falls back to what it has seen happen (active -> cleared).
+# A done entry is a flag number, or (counter, target): the rescue quests count
+# rescues in the byte variables 0x200+ and are done when the count reaches the target.
+# Quest #52 is left out: it can't be started (see UNUSED_QUESTS).
 QUEST_MARKER_BASE = 0x1C2
 
 # (index, area, name, start flags, done flags, adds to the reward counter +0x12F)
 QUESTS = [
-    (0, "Dragon Shores", "Rescue 6 dragons", [0x02], [0x104], False),
+    (0, "Dragon Shores", "Rescue 6 dragons", [0x02], [0x104, (0x200, 6)], False),
     (1, "Dragon Shores", "Retrieve lotion from Laird's room", [0x12], [0x13], False),
     (2, "Dragon Shores", "Find fountain talisman for Fonsworthy", [0xD1], [0xD5], True),
     (3, "Dragon Shores", "Deliver invite to Mrs Funderlic from Brigid", [0xD2], [0xD3], False),
@@ -88,60 +91,62 @@ QUESTS = [
     (5, "Dragon Shores", "Meet Hunter at the dock", [], [0x0E], False),
     (6, "Dragon Shores", "Find Bianca", [0x0E], [0x0F], False),
     (7, "Dragonfly Dojo", "Help Tomas", [], [0x14], False),
-    (8, "Dragonfly Dojo", "Rescue Sensei", [0x22], [], False),
-    (9, "Dragonfly Dojo", "Rescue 4 Elders", [0x25], [], False),
-    (10, "Dragon Village", "Rescue 6 Dragons", [], [], False),
+    (8, "Dragonfly Dojo", "Rescue Sensei", [0x22], [(0x209, 2)], False),
+    (9, "Dragonfly Dojo", "Rescue 4 Elders", [0x25], [(0x202, 6)], False),
+    (10, "Dragon Village", "Rescue 6 Dragons", [], [(0x206, 6)], False),
     (11, "Dragon Village", "Open gate for One Horn", [0x33], [0x34], True),
     (12, "Dragon Village", "Find Zinc's Octopus", [0x2F], [0x30], False),
     (13, "Dragon Village", "Find dragon eggs for Kaitlin", [0x31], [], False),
     (14, "Dragon Village", "Break boulders for Flame", [0x35], [0x36], False),
     (15, "Dragon Village", "Open western gate", [], [0x37], False),
-    (16, "Bear Forest", "Rescue 6 bears", [0x3B], [], False),
+    (16, "Bear Forest", "Rescue 6 bears", [0x3B], [(0x205, 4)], False),
     (17, "Bear Forest", "Power up conveyors for Merton", [0x42], [0x43], True),
     (18, "Bear Forest", "Find bolweevils for Maxwell", [0x44], [0x45], False),
     (19, "Bear Forest", "Clean Mrs. Moneybags' garden", [0x40], [0x41], False),
-    (20, "Wizard Peak", "Rescue 5 wizards", [], [], False),
+    (20, "Wizard Peak", "Rescue 5 wizards", [], [(0x21F, 5)], False),
     (21, "Wizard Peak", "Help Pastemolle cast a spell", [0x61], [0x62], True),
     (22, "Wizard Peak", "Find eyeball for Pullosin", [0x5F], [0x60], False),
     (23, "Wizard Peak", "Free minidragons for Longorin", [0x5B], [0x5C], False),
-    (24, "Cliff Town", "Rescue 5 armadillos", [], [0x77], False),
+    (24, "Cliff Town", "Rescue 5 armadillos", [], [0x77, (0x203, 5)], False),
     (25, "Cliff Town", "Escort Bandit to Dragon Village", [0x69], [], False),
     (26, "Cliff Town", "Deliver letter to Ember for Bandit", [0x6E], [0x6F], False),
     (27, "Cliff Town", "Get 3 ingredients for Isabel", [0x6C], [0x6D], True),
     (28, "Bear Forest", "Find digging tools for Pablo & Francisco", [0x70], [0x6B], False),
     (29, "Wilderness", "Defeat Shadow Minion (ice, 1st boss)", [], [0x78], False),
-    (30, "Savannah", "Rescue 5 cheetahs", [], [0xA3], False),
+    (30, "Savannah", "Rescue 5 cheetahs", [], [(0x20C, 5)], False),
     (31, "Savannah", "Get Hunter out of jail", [0xA3], [0xA5], False),
     (32, "Savannah", "Deliver note to Akello", [0x98], [0xA0], False),
     (33, "Savannah", "Talk to Neema", [0x98], [], False),
     (34, "Savannah", "Deliver medicine to Akello", [0xA0], [0xA2], True),
     (35, "Savannah", "Find medicine ingredients for Adama", [0xA1], [], False),
-    (36, "Treetops", "Rescue 4 fairies", [], [], False),
+    (36, "Treetops", "Rescue 4 fairies", [], [(0x20D, 4)], False),
     (37, "Treetops", "Find medicine leaves for fairies", [0xBF], [0xC0], False),
     (38, "Treetops", "Retrieve Zoe's wand for Amp", [0xC3], [0xC4], True),
     (39, "Treetops", "Find ice cream for Trina/Zoe", [0xBD], [0xBE], False),
     (40, "Treetops", "Put out fires for Aqua", [0xC6], [0x131], False),
-    (41, "Skelos / Prof. Lab", "Rescue 4 cavemen", [0x79], [0x97], False),
+    (41, "Skelos / Prof. Lab", "Rescue 4 cavemen", [0x79], [0x97, (0x20A, 4)], False),
     (42, "Skelos / Prof. Lab", "Find mask for Gronk", [0x94], [0x93], False),
     (43, "Skelos / Prof. Lab", "Help Lumpy across lava", [], [0x81], False),
     (44, "Skelos / Prof. Lab", "Build altar for Dirt", [0x82], [0x83], False),
-    (45, "Skelos / Prof. Lab", "Rescue Professor", [], [], False),
+    (45, "Skelos / Prof. Lab", "Rescue Professor", [], [0x8C], False),
     (46, "Savannah", "Defeat Shadow Minion (fire, 2nd boss)", [0xA4], [0x8C], False),
-    (47, "Lost Fleet", "Rescue 4 bunnies", [], [], False),
+    (47, "Lost Fleet", "Rescue 4 bunnies", [], [(0x20E, 4)], False),
     (48, "Lost Fleet", "Drain fields for Bruno", [0xDF], [], True),
     (49, "Lost Fleet", "Zap chickens for Lucia", [0xDA], [0xDB], False),
     (50, "Lost Fleet", "Help Teresa down", [0xDC], [0xDD], False),
-    (51, "Moleville", "Rescue 3 moles", [], [0x103], False),
-    (52, "Moleville", "Help Willard get home", [0xF9], [0xFA], False),
+    (51, "Moleville", "Rescue 3 moles", [], [0x103, (0x20F, 3)], False),
     (53, "Moleville", "Get sunglasses for Willard", [0xFB], [0xFC], False),
     (54, "Moleville", "Find magic detector for Sis", [0xFE], [0xFF], False),
-    (55, "Moleville", "Find Bianca", [], [], False),
+    (55, "Moleville", "Find Bianca", [], [0xFD], False),
     (56, "Moleville", "Defeat Red!", [0x102], [0xFD], True),
     (57, "Sorcerer's Land", "Defeat the Sorcerer!", [], [0x100], False),
     # 58 "Defeat Shadow Minion" exists in the quest text table, but no script
     # ever sets its marker: it is unused, so it is not counted.
 ]
-UNUSED_QUESTS = [(58, "Defeat Shadow Minion (unused: never given by any script)")]
+UNUSED_QUESTS = [
+    (52, "Help Willard get home (unused: the torch quest's scripts are never called, see RESEARCH.md)"),
+    (58, "Defeat Shadow Minion (unused: never given by any script)"),
+]
 
 OVERWORLD_EGG_TARGET = 40   # the category's current rule; 41 are obtainable (see RESEARCH.md)
 
@@ -157,6 +162,8 @@ HOLE_EGG_GROUPS = {   # object group -> (hole number, where its entrance is)
     27: (26, "Wilderness, Ice boss area"),
     28: (27, "Wilderness, Avalar"),
 }
+
+KAITLIN_EGG_RETURNED = 0x32   # set when you give Kaitlin her lost egg back (the egg count drops by 1)
 
 # ---- eggs handed over by scripts (GiveOneItem 25), with the quest flag set alongside
 NPC_EGGS = [

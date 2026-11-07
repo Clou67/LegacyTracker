@@ -90,7 +90,7 @@ def evaluate(snap, history=None, run="default"):
     quests = []
     for idx, area, name, start, done, reward in G.QUESTS:
         marker = v[G.QUEST_MARKER_BASE + idx] != 0
-        done_flag = any(v[f] for f in done)
+        done_flag = any((v[f[0]] >= f[1]) if isinstance(f, tuple) else v[f] for f in done)
         started_flag = any(v[f] for f in start)
         if done_flag:
             state, how = "done", "flag"
@@ -126,6 +126,19 @@ def evaluate(snap, history=None, run="default"):
         if lv["here"]:
             lv["pending"] = snap.pending
     eggs_held = inv[G.INV_EGGS]
+    # The Hole from the egg count: every egg you collect stays in the count except
+    # Kaitlin's, which you give back. So if no Hole egg is left in the level data,
+    # the count tells whether it was taken (one more than the rest) or wiped.
+    for lv in per_level["levels"]:
+        if lv.get("hole") == "gone" and states:
+            rest = per_level["got"] - lv["got"]
+            expect = rest - (1 if v[G.KAITLIN_EGG_RETURNED] else 0) + snap.pending
+            if eggs_held == expect + 1:
+                lv.update(hole="got", got=1, note="Hole egg collected (worked out from the egg count).")
+                per_level["got"] += 1
+            elif eggs_held == expect:
+                lv.update(hole="lost", note=("Hole egg LOST: The Hole was entered and its eggs are gone, and the egg "
+                                             "count shows none was picked up. Only the first hole entered keeps its egg."))
 
     # ---- upgrades
     bits = struct.unpack_from("<H", inv, G.INV_UPGRADES)[0]

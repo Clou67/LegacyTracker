@@ -36,17 +36,56 @@ AddCounter12F         <- +1 egg
 SaveGame
 ```
 
-`tracker/gamedata.py` lists each quest's start and done flags. For 50 of the
-58 real quests a done flag is known (three are the boss fights:
-`BossBattle1.c` sets 0x78 / 0x8C / 0x100 when they are won). The other 8
-(the "Rescue N …" quests, Rescue Sensei, Rescue Professor, Find Bianca #2,
-Kaitlin's eggs) are cleared by scripts that only run once a counter is reached,
-with no flag next to them. For those, the live tracker remembers seeing the
-marker on (`tracker_history.json`) and counts the quest as done when the marker
-goes away.
+`tracker/gamedata.py` lists each quest's start and done flags.
 
-**Quest 58 "Defeat Shadow Minion" is never given by any script.** It is unused,
-so 100% is **58 quests**, not 59.
+### Rescue quests count, they don't flag
+
+The "Rescue N …" quests have no done flag. Each one counts rescues in a byte
+variable (the 0x30 saved bytes at `g_ScriptVars[0x200..0x22F]`, changed with
+`VarAdd`), and the quest is done when the count reaches its target. Both
+finished 100% saves have every counter at its target:
+
+| Counter | Quest | Target |
+|---|---|---|
+| 0x200 | Rescue 6 dragons (Dragon Shores) | 6 |
+| 0x202 | Rescue 4 Elders (counts the Elders and Sensei) | 6 |
+| 0x203 | Rescue 5 armadillos | 5 |
+| 0x205 | Rescue 6 bears | 4 |
+| 0x206 | Rescue 6 Dragons (Dragon Village) | 6 |
+| 0x209 | Rescue Sensei (set to 2 when he is freed) | 2 |
+| 0x20A | Rescue 4 cavemen | 4 |
+| 0x20C | Rescue 5 cheetahs | 5 |
+| 0x20D | Rescue 4 fairies | 4 |
+| 0x20E | Rescue 4 bunnies | 4 |
+| 0x20F | Rescue 3 moles | 3 |
+| 0x21F | Rescue 5 wizards | 5 |
+
+(The bears' script compares against 4, though the quest text says 6.)
+
+Other quests with no done flag of their own are cleared by another quest's
+script: **Rescue Professor** is cleared in the same cutscene as the fire
+Shadow Minion quest (done flag 0x8C). **Find Bianca** (Moleville) is cleared
+in the Defeat Red script (done flag 0xFD). **Find dragon eggs for Kaitlin**
+is still worked out as "started and cleared".
+
+The three boss fights set their done flags in code (`BossBattle1.c` sets
+0x78, 0x8C and 0x100 when they are won).
+
+### Unused quests: 100% is 57 quests
+
+* **#58 "Defeat Shadow Minion"** is never given by any script.
+* **#52 "Help Willard get home"** (put out the torches so Willard can walk
+  home in the dark) is cut content. Its scripts exist in `Moleville.app`:
+  the question "Can you put out the torches?" (script 42,
+  conversation `Willard_Torch_Start`), the start (43: sets 0xF9 and the
+  marker), the torch counters (34-37, 54), their resets (119-124) and the
+  finish (125: sets 0xFA, clears the marker). But no script, object, path or
+  entry point ever runs script 42. Willard's talk script (26) checks 0xF9
+  and, because it is never set, always goes straight to "Get sunglasses for
+  Willard". Both finished saves have 0xF9 = 0.
+
+So the game's 59 quest texts give **57 real quests**. Both finished saves
+read 57/57.
 
 ## Eggs
 
@@ -142,15 +181,24 @@ The other 23 holes have no egg. Consequences:
 * The same happens to everything else saved in the holes (chests, breakables),
   not just eggs.
 
-This comes from the code and data. It still needs checking on a fresh file:
+**The two finished saves agree with this.** In both, The Hole was entered and
+all 5 eggs read as gone. The egg count is 39: 36 placed + 4 NPC eggs, minus
+Kaitlin's lost egg, which you hand back. A Hole egg would make it 40. So
+both runs entered a hole without an egg (or left an egg hole after another
+one), and the Hole egg was lost.
+
+A cleaner check on a fresh file:
 (1) enter Hermit Cave's hole first, take the egg, then check that the
 Dragon Shores hole is empty; (2) on another file, enter a hole with no egg
 first, then check that every egg hole is empty.
 
 How the tracker handles it: it counts The Hole as one egg. Reading the save
 (or RAM) gives "not entered yet" (all 5 still there), "the egg is still in
-hole *n*" (one left), or "gone" (none left). When it watches live, it records
-an egg picked up inside The Hole, so it can tell "taken" apart from "lost". It
+hole *n*" (one left), or none left. When none are left, the egg count
+settles it: every egg you collect stays in the count except Kaitlin's (flag
+0x32 marks it returned). One more than expected means the Hole egg was
+taken, exactly the expected number means it was lost. The live tracker
+also records an egg picked up inside The Hole. It
 also reads 0x184 while you're in The Hole and warns you if you're in a hole
 without an egg before anything has been taken.
 
@@ -200,8 +248,8 @@ game.
 * Confirm The Hole behaviour in game (tests above), and check whether the
   `WarpToMap` entries with hole number 0 (Boat, Titan's house, Hermit House,
   DR North) are real hole entrances or another use of the command.
-* Confirming the per-level save layout against a real save: it is so far
-  only tested on data written by the tracker's own copy of the game's writer.
+* ~~Confirm the save layout on a real save~~: done with two finished 100%
+  saves (melonDS, 8 KB). Every placed egg outside The Hole reads as collected.
 * Each ability's real maximum. The tracker assumes 3, and 4 for Tail
   (`Abilities_SetLevel` only allows 4 for that counter). Confirm against the
   dojo.
@@ -211,11 +259,10 @@ game.
 
 ## Route check (hundo_route.xlsx, "Quests" sheet)
 
-All 58 quests were matched by name against the route's quest list:
+All quests were matched by name against the route's quest list:
 
-* **Missing from the route: "Help Willard get home"** (Moleville, quest 52,
-  400 XP; done flag 0xFA). It is a separate quest from "Get sunglasses for
-  Willard".
+* The route has every real quest. The one it lacks, "Help Willard get home",
+  is unused content (see "Unused quests").
 * "Kill Shelly" is a story event, not one of the game's quests.
 * The route lists three Shadow Minion fights (ice, Savannah, fire), but the
   game has two Shadow Minion quests: the ice minion (1st boss) and one that

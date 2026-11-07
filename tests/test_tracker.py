@@ -20,7 +20,10 @@ def make_state(level_index=24, xp=215000, eggs=48, upgrades=0x7ff, abil=3, quest
     if quests_done:
         for q in G.QUESTS:
             for f in q[4]:
-                v[f] = 1
+                if isinstance(f, tuple):
+                    v[f[0]] = f[1]
+                else:
+                    v[f] = 1
             for f in q[3]:
                 v[f] = 1
     return hdr, v, inv, ab
@@ -38,12 +41,16 @@ class T(unittest.TestCase):
         hdr, v, inv, ab = make_state(quests_done=False)
         v[G.QUEST_MARKER_BASE + 11] = 1          # One Horn active
         v[0x36] = 1                              # Flame done flag
-        v[0x3B] = 1                              # bears started, no done flag known
+        v[0x3B] = 1                              # bears started, count not reached
+        v[0x31] = 1                              # Kaitlin started, no done flag known
+        v[0x20E] = 4                             # bunnies: 4 rescued
         r = progress.evaluate(progress.Snapshot(hdr, v, inv, ab))
         st = {q["id"]: q["state"] for q in r["quests"]}
         self.assertEqual(st[11], "active")
         self.assertEqual(st[14], "done")
-        self.assertEqual(st[16], "done")       # inferred
+        self.assertEqual(st[16], "started")
+        self.assertEqual(st[13], "done")       # inferred
+        self.assertEqual(st[47], "done")       # counter
         self.assertEqual(st[0], "todo")
 
     def test_history(self):
@@ -90,6 +97,19 @@ class T(unittest.TestCase):
         r = progress.evaluate(snap)
         self.assertEqual(r["level"]["level"], 10)
         self.assertEqual(r["eggs"]["held"], 12)
+
+    def test_real_saves(self):
+        """SSL_SAVES=a.sav:b.sav  (finished 100% runs)"""
+        paths = [p for p in os.environ.get("SSL_SAVES", "").split(os.pathsep) if p]
+        if not paths:
+            self.skipTest("set SSL_SAVES to finished 100% save files")
+        for p in paths:
+            (_, snap), = savefile.read_save(p)
+            r = progress.evaluate(snap)
+            self.assertEqual(r["quests_done"], r["quests_total"], p)
+            self.assertEqual(r["level"]["level"], 25)
+            hole = [l for l in r["eggs"]["levels"] if l.get("hole") is not None][0]
+            self.assertIn(hole["hole"], ("got", "lost"))
 
     def test_signatures_match_rom(self):
         rom = os.environ.get("SSL_ROM")

@@ -4,7 +4,7 @@ An automatic 100% tracker for **Spyro: Shadow Legacy** (DS, USA). It reads the
 game's memory while you play, either in **melonDS** or in the **projShadow PC
 port** (`spShadowLegacy.exe`), and shows the 100% rules live:
 
-* every quest (58), split into to do / active / done
+* every quest (57; two of the game's 59 quest texts are unused), split into to do / active / done
 * every egg, level by level: 41 obtainable (36 placed, 1 from The Hole, 4 from NPCs)
 * The Hole's one-egg trap: it warns you live if you're in a hole without an egg
 * each upgrade tier (wallet, butterfly bottle, mushroom bag, keychain)
@@ -32,15 +32,13 @@ hide finished quests.
 On Windows, `run_tracker.bat` starts it. On Linux, reading another program's
 memory may need `sudo sysctl kernel.yama.ptrace_scope=0`.
 
-## What "seen" means on a quest
+## How quests are read
 
-The game only marks a quest while it is **active**. After you finish it, the
-mark is cleared again. For 50 quests the game also sets a "finished" story
-flag, and the tracker reads that. For the other 8 (mostly the "Rescue N …"
-quests) no such flag is known. Those count as done once the tracker has seen
-them active and then cleared, which it remembers in `tracker_history.json`.
-They are tagged `seen` in the list. Reading a save file can't show these 8
-unless the tracker watched them happen.
+The game only marks a quest while it is **active**, then clears the mark.
+Whether a quest is finished comes from a separate story flag, or for the
+"Rescue N …" quests from a rescue counter reaching its target. That works
+from a save file too. One quest (Kaitlin's eggs) has neither: it counts as
+done once it was started and its mark cleared (tagged `inferred`).
 
 ## The Hole
 
