@@ -3,3 +3,4 @@ hundo_route.xlsx
 tracker_history.json
 __pycache__/
 *.pyc
+dist/

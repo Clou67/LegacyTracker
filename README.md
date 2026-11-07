@@ -12,7 +12,24 @@ port** (`spShadowLegacy.exe`), and shows the 100% rules live:
 
 It needs only Python 3.8+ (64-bit) and nothing else to install.
 
-## Use
+## Desktop app (Windows)
+
+`SSLTracker.exe` is the tracker in its own window: no browser, no Python,
+nothing to install. Double-click it.
+
+* **File > Watch the game**: follows melonDS or `spShadowLegacy.exe` while you play (the default).
+* **File > Open save file...**: reads a melonDS `.sav` or the PC port's `spyro.sav`. It updates by itself
+  whenever the game saves, which happens on every map change.
+* **View**: *Hide finished*, *Compact* (just the checklist and eggs, good next to the game), *Always on top*.
+* Scroll with the mouse wheel if the window is smaller than the list.
+
+It keeps `tracker_history.json` next to itself (quests and the Hole egg it has seen done live).
+`SSLTracker.exe -text -save FILE` prints the same report in a console.
+
+Build it yourself with `desktop/build.sh` (needs only Go). It's a port of the Python tracker, and the tests
+check that both give identical reports on real saves.
+
+## Python version (browser overlay, e.g. for OBS)
 
 ```sh
 python -m tracker              # start melonDS or the PC port first, then this
