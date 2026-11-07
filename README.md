@@ -5,7 +5,7 @@ game's memory while you play, either in **melonDS** or in the **projShadow PC
 port** (`spShadowLegacy.exe`), and shows the 100% rules live:
 
 * every quest (58), split into to do / active / done
-* overworld eggs, worked out from the egg counter minus quest-reward eggs
+* every overworld egg, level by level (41 in the game: 22 loose, 19 in chests)
 * each upgrade tier (wallet, butterfly bottle, mushroom bag, keychain)
 * ability levels, hero level and XP
 

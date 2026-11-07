@@ -16,6 +16,9 @@ ADDR_SLOT_HEADERS = 0x020EBC40   # 3 x 0x20-byte slot headers; the current one h
 ADDR_SCRIPT_VARS = 0x020D9F9C    # u8[0x240] g_ScriptVars (saved story flags)
 ADDR_INVENTORY = 0x020DEF74      # u8[0x130] g_HeroPowerUps
 ADDR_ABILITIES = 0x020EBCE4      # u8[0x14]  g_AbilityLevels (progress counters)
+ADDR_SAVE_STREAM = 0x020EBBC8    # g_SaveStream: +0 buffer pointer, +0xe u16 size
+ADDR_GROUP_TABLE = 0x020D9F90    # u8 *g_GroupTable: the current level's objects (+0 of a record: its actor)
+ADDR_CURRENT_MAP = 0x020DF128    # s32 g_CurrentMap: level index (0-0x28)
 
 # Code bytes used to find emulated RAM inside another process: (DS address, bytes).
 # Taken from the static ARM9 code, which the game never overwrites.
@@ -40,7 +43,8 @@ INV_UPGRADES = 0x11E   # u16 upgrade bits
 INV_KEYS = 0x12B       # u8
 INV_HEALTH_POTIONS = 0x12C
 INV_MANA_POTIONS = 0x12D
-INV_EGGS = 0x12F       # u8 dragon eggs (every egg: overworld pickups and quest rewards)
+INV_EGGS = 0x12E       # u8 dragon eggs held (item 25; Kaitlin takes back her lost one)
+INV_REWARDS = 0x12F    # u8 a counter that quest rewards add to (AddCounter12F); NOT eggs
 
 # Upgrade bits (Inventory_Give / Inventory_ClampCounter). Each purchase ORs in its
 # own bit; the capacity comes from the HIGHEST bit owned, so lower tiers have no
@@ -74,7 +78,7 @@ DEFAULT_ABILITY_MAX = 3
 # tracker falls back to what it has seen happen (active -> cleared).
 QUEST_MARKER_BASE = 0x1C2
 
-# (index, area, name, start flags, done flags, gives an egg)
+# (index, area, name, start flags, done flags, adds to the reward counter +0x12F)
 QUESTS = [
     (0, "Dragon Shores", "Rescue 6 dragons", [0x02], [0x104], False),
     (1, "Dragon Shores", "Retrieve lotion from Laird's room", [0x12], [0x13], False),
@@ -139,9 +143,4 @@ QUESTS = [
 ]
 UNUSED_QUESTS = [(58, "Defeat Shadow Minion (unused: never given by any script)")]
 
-# Eggs given by a script that we could not tie to a quest (see RESEARCH.md).
-UNATTRIBUTED_SCRIPT_EGGS = [
-    "Dragon Shores Inn, floor 1 (event script, +300 XP)",
-    "Skelos / Professor's Lab (event script after two talks)",
-]
-OVERWORLD_EGG_TARGET = 40
+OVERWORLD_EGG_TARGET = 40   # the category's rule; the game places 41 (see RESEARCH.md)

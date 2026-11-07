@@ -4,20 +4,25 @@ import os
 import struct
 
 from . import gamedata as G
+from . import eggs as E
 
 
 class Snapshot:
     """The raw bytes the tracker needs, from RAM or from a save file."""
 
-    def __init__(self, header, script_vars, inventory, abilities, source=""):
+    def __init__(self, header, script_vars, inventory, abilities, source="",
+                 stream=None, level=None, pending=0):
         self.header = bytes(header)          # 0x20
         self.vars = bytes(script_vars)       # 0x240
-        self.inv = bytes(inventory)          # 0x130 (RAM layout) or None fields from a save
+        self.inv = bytes(inventory)          # 0x130 (RAM layout)
         self.abilities = bytes(abilities)    # 0x14
         self.source = source
+        self.stream = bytes(stream) if stream else None   # the save stream (per-level objects)
+        self.level = level                   # level index the hero is in (live only)
+        self.pending = pending               # eggs picked up in this level since entering it
 
     def key(self):
-        return (self.header, self.vars, self.inv, self.abilities)
+        return (self.header, self.vars, self.inv, self.abilities, self.stream, self.level, self.pending)
 
 
 def hero_level(header):
@@ -76,7 +81,7 @@ def evaluate(snap, history=None, run="default"):
         seen = set()
 
     quests = []
-    for idx, area, name, start, done, egg in G.QUESTS:
+    for idx, area, name, start, done, reward in G.QUESTS:
         marker = v[G.QUEST_MARKER_BASE + idx] != 0
         done_flag = any(v[f] for f in done)
         started_flag = any(v[f] for f in start)
@@ -92,14 +97,22 @@ def evaluate(snap, history=None, run="default"):
         else:
             state, how = "todo", ""
         quests.append(dict(id=idx, area=area, name=name, state=state, how=how,
-                           egg=egg, sure=bool(done)))
+                           reward=reward, sure=bool(done)))
 
     n_done = sum(q["state"] == "done" for q in quests)
 
     # ---- eggs
-    eggs_total = inv[G.INV_EGGS]
-    quest_eggs = sum(1 for q in quests if q["egg"] and q["state"] == "done")
-    overworld = max(0, eggs_total - quest_eggs)
+    states = {}
+    if snap.stream:
+        try:
+            states = E.from_stream(snap.stream)
+        except (struct.error, IndexError):
+            states = {}
+    per_level = E.summarize(states, snap.level)
+    for lv in per_level["levels"]:
+        if lv["here"]:
+            lv["pending"] = snap.pending
+    eggs_held = inv[G.INV_EGGS]
 
     # ---- upgrades
     bits = struct.unpack_from("<H", inv, G.INV_UPGRADES)[0]
@@ -133,9 +146,11 @@ def evaluate(snap, history=None, run="default"):
         quests=quests,
         quests_done=n_done,
         quests_total=len(quests),
-        eggs=dict(total=eggs_total, from_quests=quest_eggs, overworld=overworld,
-                  overworld_target=G.OVERWORLD_EGG_TARGET,
-                  unattributed=G.UNATTRIBUTED_SCRIPT_EGGS),
+        eggs=dict(held=eggs_held, got=per_level["got"] + snap.pending, placed=per_level["total"],
+                  pending=snap.pending,
+                  target=G.OVERWORLD_EGG_TARGET, levels=per_level["levels"],
+                  known=bool(states)),
+        rewards=inv[G.INV_REWARDS],
         upgrades=upgrades,
         upgrade_bits=bits,
         abilities=abilities,
@@ -149,7 +164,7 @@ def checklist(r):
     abil_done = sum(a["level"] >= a["max"] for a in r["abilities"])
     return [
         dict(rule="All quests", have=r["quests_done"], need=r["quests_total"]),
-        dict(rule="40 overworld eggs (estimate)", have=min(r["eggs"]["overworld"], 40), need=40),
+        dict(rule="40 overworld eggs", have=min(r["eggs"]["got"], r["eggs"]["target"]), need=r["eggs"]["target"]),
         dict(rule="All upgrade tiers bought", have=sum(sum(u["tiers"]) for u in r["upgrades"]),
              need=sum(len(u["tiers"]) for u in r["upgrades"])),
         dict(rule="Max upgrades (top tier only)", have=sum(u["maxed"] for u in r["upgrades"]),

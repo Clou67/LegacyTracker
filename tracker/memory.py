@@ -7,6 +7,7 @@ original addresses, so the same search simply finds it at 0x02000000.
 """
 import ctypes
 import os
+import struct
 import sys
 
 from . import gamedata as G
@@ -183,6 +184,7 @@ class GameMemory:
         pid, self.name = find_game_process(pid)
         self.proc = Process(pid)
         self.base = find_ram_base(self.proc)
+        self._watch_level, self._entry_eggs = None, 0
 
     def read(self, ds_addr, n):
         return self.proc.read(self.base + ds_addr - G.DS_MAIN, n)
@@ -194,17 +196,41 @@ class GameMemory:
         except MemoryError_:
             return False
 
+    def _ptr_ok(self, p, n=1):
+        return G.DS_MAIN <= p and p + n <= G.DS_MAIN + G.DS_MAIN_SIZE
+
+    def _stream(self):
+        buf, = struct.unpack("<I", self.read(G.ADDR_SAVE_STREAM, 4))
+        size, = struct.unpack("<H", self.read(G.ADDR_SAVE_STREAM + 0xE, 2))
+        if not size or not self._ptr_ok(buf, size):
+            return None
+        return self.read(buf, size)
+
     def snapshot(self):
         from .progress import Snapshot
-        import struct
         slot = struct.unpack("<i", self.read(G.ADDR_CURRENT_SLOT, 4))[0]
         if not 0 <= slot <= 2:
             slot = 0
         hdr = self.read(G.ADDR_SLOT_HEADERS + slot * 0x20, 0x20)
+        level, = struct.unpack("<i", self.read(G.ADDR_CURRENT_MAP, 4))
+        if not 0 <= level < 0x29:
+            level = None
+        inv = self.read(G.ADDR_INVENTORY, 0x130)
+        # eggs picked up since entering this level: the level's saved state is only
+        # updated when the map is left (auto-save), so count them meanwhile
+        held = inv[G.INV_EGGS]
+        if level != self._watch_level:
+            self._watch_level, self._entry_eggs = level, held
+        self._entry_eggs = min(self._entry_eggs, held)
+        pending = held - self._entry_eggs
+        try:
+            stream = self._stream()
+        except MemoryError_:
+            stream = None
         return Snapshot(hdr, self.read(G.ADDR_SCRIPT_VARS, 0x240),
-                        self.read(G.ADDR_INVENTORY, 0x130),
-                        self.read(G.ADDR_ABILITIES, 0x14),
-                        source=f"{self.name} (slot {slot + 1})"), slot
+                        inv, self.read(G.ADDR_ABILITIES, 0x14),
+                        source=f"{self.name} (slot {slot + 1})",
+                        stream=stream, level=level, pending=pending), slot
 
     def close(self):
         self.proc.close()

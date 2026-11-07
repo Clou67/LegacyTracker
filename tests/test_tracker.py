@@ -67,8 +67,7 @@ class T(unittest.TestCase):
 
     def test_full(self):
         r = progress.evaluate(progress.Snapshot(*make_state()))
-        eggq = sum(q[5] for q in G.QUESTS)
-        self.assertEqual(r["eggs"]["overworld"], 48 - eggq)
+        self.assertEqual(r["eggs"]["held"], 48)
         self.assertEqual(r["level"]["level"], 25)
         flagged = sum(1 for q in G.QUESTS if q[3] or q[4])
         self.assertEqual(r["quests_done"], flagged)   # the rest need the live history
@@ -90,7 +89,7 @@ class T(unittest.TestCase):
             self.assertEqual(snap.inv[off], inv[off])
         r = progress.evaluate(snap)
         self.assertEqual(r["level"]["level"], 10)
-        self.assertEqual(r["eggs"]["total"], 12)
+        self.assertEqual(r["eggs"]["held"], 12)
 
     def test_signatures_match_rom(self):
         rom = os.environ.get("SSL_ROM")
@@ -104,3 +103,38 @@ class T(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Eggs(unittest.TestCase):
+    def test_data(self):
+        from tracker.levels_data import LEVELS
+        self.assertEqual(sum(len(l[4]) for l in LEVELS), 41)
+        self.assertEqual(len(LEVELS), 0x29)
+        for idx, f, n, layout, eggs in LEVELS:
+            for g, k, *_ in eggs:
+                self.assertNotEqual(layout[g][k], "-", f)   # every egg is saved
+
+    def test_per_level_from_save(self):
+        from tracker import eggs as E
+        from tracker.levels_data import LEVELS
+        all_eggs = [(i, g, k) for i, f, n, l, e in LEVELS for g, k, *_ in e]
+        gone = set(all_eggs[::3])
+        hdr, v, inv, ab = make_state(quests_done=False)
+        stream = savefile.build_stream(v, inv, ab, gone, visited={i for i, *_ in all_eggs if i != 1})
+        img = savefile.build_save({0: (hdr, stream)})
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "x.sav")
+            open(p, "wb").write(img)
+            (_, snap), = savefile.read_save(p)
+        r = progress.evaluate(snap)
+        expect = sum(1 for e in gone if e[0] != 1)
+        self.assertEqual(r["eggs"]["got"], expect)
+        lv = {l["level"]: l for l in r["eggs"]["levels"]}
+        self.assertFalse(lv[1]["known"])          # Bear Forest not visited in this save
+        self.assertTrue(lv[3]["known"])
+        text_report(dict(r, status="save"))
+
+    def test_bad_stream_is_ignored(self):
+        hdr, v, inv, ab = make_state()
+        r = progress.evaluate(progress.Snapshot(hdr, v, inv, ab, stream=b"\x00" * 40))
+        self.assertEqual(r["eggs"]["got"], 0)

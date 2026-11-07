@@ -91,7 +91,8 @@ def parse_stream(stream):
 
 
 def read_save(path, slot=None):
-    data = open(path, "rb").read()
+    with open(path, "rb") as f:
+        data = f.read()
     slots = find_slots(data)
     if not slots:
         raise ValueError("no valid save slot found in " + path)
@@ -101,7 +102,7 @@ def read_save(path, slot=None):
     for idx, off, body in slots:
         hdr = data[off:off + 0x20]
         v, inv, ab = parse_stream(body)
-        out.append((idx, Snapshot(hdr, v, inv, ab, source=f"{path} (slot {idx + 1})")))
+        out.append((idx, Snapshot(hdr, v, inv, ab, source=f"{path} (slot {idx + 1})", stream=body)))
     return out
 
 
@@ -121,7 +122,7 @@ def build_save(slots, slot_size=0x1000, total=0x8000):
     return bytes(data)
 
 
-def build_stream(vars_, inv, abilities):
+def build_stream(vars_, inv, abilities, eggs_gone=(), visited=None):
     out = bytearray([6]) + bytes(6)
     flags = bytearray(0x40)
     for i in range(0x200):
@@ -135,4 +136,6 @@ def build_stream(vars_, inv, abilities):
     s += bytes([inv[0x12A]]) + inv[0x120:0x129] + inv[0x11C:0x120] + inv[0x12B:0x130]
     out += struct.pack("<H", len(s)) + s
     out += abilities
+    from .eggs import build_levels
+    out += build_levels(len(out), eggs_gone, visited)
     return bytes(out)

@@ -87,7 +87,12 @@ def text_report(r):
     lv = r["level"]
     out.append(f"\nLevel {lv['level']}  XP {lv['xp']}" + (f"/{lv['next_xp']}" if lv["next_xp"] else ""))
     e = r["eggs"]
-    out.append(f"Eggs: {e['total']} total = {e['overworld']} overworld (est.) + {e['from_quests']} quest rewards")
+    out.append(f"Eggs: {e['got']}/{e['placed']} placed eggs found ({e['held']} held now)")
+    for lv in e["levels"]:
+        mark = "x" if lv["got"] == lv["total"] else " "
+        here = "  <- here" + (f" (+{lv['pending']} picked up, saved when you leave)" if lv.get("pending") else "") if lv["here"] else ""
+        status = "" if lv["known"] else "  (not in this save yet)"
+        out.append(f"  [{mark}] {lv['name']:<28} {lv['got']}/{lv['total']}{status}{here}")
     out.append("Upgrades:")
     for u in r["upgrades"]:
         tiers = "".join("#" if t else "-" for t in u["tiers"])

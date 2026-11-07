@@ -36,7 +36,12 @@
   .cols { columns:2; column-gap:16px; }
   .grp { break-inside:avoid; }
   .cols .grp:first-child .area { margin-top:0; }
-  .hidedone .q.done { display:none; }
+  .hidedone .q.done, .hidedone .lv.full { display:none; }
+  .lv { display:flex; justify-content:space-between; gap:8px; padding:1px 0; break-inside:avoid; }
+  .lv.here .lname { color:var(--active); }
+  .lv.full .lname { color:var(--dim); }
+  .lv .pend { color:var(--active); font-size:11px; }
+  .pip-unk { color:var(--dim); }
   .controls { margin-left:auto; display:flex; gap:10px; color:var(--dim); font-size:12px; }
   .controls label { cursor:pointer; }
   #wait { padding:40px 14px; color:var(--dim); }
@@ -62,7 +67,11 @@
     <section style="margin-top:10px"><h2>Upgrades</h2><div id="upgrades"></div></section>
     <section style="margin-top:10px"><h2>Abilities</h2><div id="abilities"></div></section>
   </div>
-  <section id="questbox"><h2 id="qtitle">Quests</h2><div class="cols" id="quests"></div></section>
+  <div>
+    <section id="questbox"><h2 id="qtitle">Quests</h2><div class="cols" id="quests"></div></section>
+    <section style="margin-top:10px"><h2 id="etitle">Eggs by level</h2><div class="cols" id="egglevels"></div>
+      <div class="sub" id="eggnote" style="margin-top:6px"></div></section>
+  </div>
 </main>
 <script>
 const $ = id => document.getElementById(id);
@@ -96,8 +105,18 @@ function render(r) {
   $("lvl").textContent = "Lv " + L.level;
   $("xp").textContent = L.next_xp ? `${L.xp.toLocaleString()} / ${L.next_xp.toLocaleString()} XP` : `${L.xp.toLocaleString()} XP (max)`;
   const E = r.eggs;
-  $("eggs").textContent = `${E.overworld}/${E.overworld_target}`;
-  $("eggsub").textContent = `overworld eggs (${E.total} total, ${E.from_quests} from quests)`;
+  $("eggs").textContent = `${E.got}/${E.target}`;
+  $("eggsub").textContent = `eggs found (${E.placed} in the game, ${E.held} held)`;
+  $("etitle").textContent = `Eggs by level ${E.got}/${E.placed}`;
+  $("egglevels").innerHTML = E.levels.map(l => {
+    const p = l.eggs.map(e => e.state === 'got' ? '<span class="pip-on">■</span>' :
+                              e.state === 'left' ? '<span class="pip-off">□</span>' : '<span class="pip-unk">?</span>').join('');
+    const pend = l.pending ? ` <span class="pend">+${l.pending}</span>` : '';
+    const tip = l.eggs.map(e => `${e.kind} at ${e.x},${e.y}: ${e.state}`).join('\n');
+    return `<div class="lv ${l.got === l.total ? 'full' : ''} ${l.here ? 'here' : ''}" title="${esc(tip)}"><span class="lname">${l.here ? '▸ ' : ''}${esc(l.name)}${pend}</span><span><span class="pips">${p}</span> <span class="sub">${l.got}/${l.total}</span></span></div>`;
+  }).join('');
+  $("eggnote").textContent = E.known ? "■ got  □ still there  ? level not in the save yet. A level's eggs update when you leave it (the game auto-saves)." :
+                                       "No level data yet: eggs show after the first map change.";
   $("gems").textContent = r.gems.toLocaleString();
   $("upgrades").innerHTML = r.upgrades.map(u =>
     `<div class="row"><span>${esc(u.name)}</span><span><span class="pips">${pips(u.tiers)}</span> <span class="sub">${u.capacity}/${u.max_capacity}</span></span></div>`).join('');
@@ -110,7 +129,7 @@ function render(r) {
   for (const [area, qs] of groups) {
     html += `<div class="grp"><div class="area">${esc(area)}</div>`;
     for (const q of qs) {
-      const tags = (q.egg ? '<span class="tag">egg</span>' : '') +
+      const tags = (q.reward ? '<span class="tag" title="adds to the reward counter">reward</span>' : '') +
                    (q.how === 'seen' || q.how === 'inferred' ? `<span class="tag" title="no completion flag known; ${q.how === 'seen' ? 'seen active, then cleared' : 'started, then cleared'}">${q.how}</span>` : '');
       html += `<div class="q ${q.state}"><span class="dot"></span><span class="name">${esc(q.name)}</span>${tags}</div>`;
     }

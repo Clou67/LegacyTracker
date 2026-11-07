@@ -48,25 +48,48 @@ goes away.
 **Quest 58 "Defeat Shadow Minion" is never given by any script.** It is unused,
 so 100% is **58 quests**, not 59.
 
-## Eggs: why the count looks inconsistent
+## Eggs
 
-There is a single egg counter, inventory +0x12F. It counts *every* egg:
-overworld pickups **and** quest rewards. Quest scripts give eggs with
-`AddCounter12F` (script opcode 87). 11 scripted eggs were found:
+**Correction:** an earlier version of this file said the egg counter was
+inventory +0x12F. That was wrong. +0x12F is a separate counter that quest
+rewards add to (`AddCounter12F`, script opcode 87; it's probably the
+route sheet's "relics"). Eggs are **item 25**, held at inventory **+0x12E**:
+`Inventory_Give` case 25 adds to it, Kaitlin's script takes one back when you
+return her lost egg (`AddCounter -1`), and her reward script checks the count
+against 30 (`SoundByCounter 30`).
 
-* 9 for finishing a quest: Fonsworthy's talisman, One Horn's gate, Merton's
-  conveyors, Pastemolle's spell, Isabel's ingredients, Akello's medicine,
-  Zoe's wand, Bruno's fields and Defeat Red.
-* 2 from event scripts with no quest next to them (Dragon Shores Inn floor 1,
-  Skelos / Professor's Lab).
-* The tracker estimates **overworld eggs = total − eggs from quests it has
-  seen finished**. Two scripted eggs aren't tied to a quest yet, so the estimate
-  can run up to 2 high until those are pinned down.
+### Where every egg is
 
-So "more than 40 eggs" is expected: about 40 overworld eggs plus 11
-scripted eggs. No script takes eggs away. `PayGems` reads the egg counter but is
-only used with 0 in the shipped scripts. Kaitlin's 30-egg reward only checks
-the count.
+Each overworld egg is a **level object**, not a story flag:
+
+* the level list is table 25 of the game database (`TablesR_*.rom`, rows of
+  `g_LevelAreas`). Its `ScriptData` column is the FAT file id of the level's
+  `.app` file.
+* a `.app` file holds the level's object groups (`Appearances_BuildTables`).
+  Each object record starts with its type. **Eggs are type-10 items with item
+  25 at +8 (22 of them), and type-6 chests with item 25 in a drop slot
+  (+0x0A, +0x10 or +0x16; 19 of them).**
+
+That makes **41 egg objects in 23 levels** (`tracker/levels_data.py`, made by
+`research/extract_eggs.py`). The rule says 40. The extra one is probably
+Kaitlin's lost egg, which you have to give back. Comparing against the route's
+Eggs sheet will confirm this.
+
+### How the game remembers them (your byte-array hunch, almost)
+
+The game keeps no flag per egg in RAM. Each level's object state is kept as a
+**bit array in the save stream** (`Appearances_WriteGroup`). For every object
+that keeps state there is one bit: 1 = still there, 0 = gone. A few object
+types follow their bit with a state bit (signs, platforms) or a state byte
+(counters). The level data sits after the abilities: a table of 0x29 u16
+positions, then per level a u16 group count, u16 group offsets, and the
+groups' bits. A picked-up egg and an opened egg chest both read as 0.
+
+The game auto-saves on **every map exit** (`Map_Exit` → `SaveGame_Save`). So
+the save file, and the stream buffer in RAM (`g_SaveStream`), cover every
+level up to the last map change. The tracker reads both. In the level you
+are standing in, it shows eggs picked up since you entered as "+N" until you
+leave.
 
 ## Upgrades: they do stack, but only the top tier matters
 
@@ -95,9 +118,10 @@ game.
 
 ## Open questions
 
-* The individual overworld egg pickups. They are saved with the level's
-  object state, not in the story flags, so the tracker can only count them.
-* Which quest, if any, the two unattributed scripted eggs belong to.
+* Which of the 41 egg objects is the one the rule leaves out (probably
+  Kaitlin's). Check against the route's Eggs sheet.
+* Confirming the per-level save layout against a real save: it is so far
+  only tested on data written by the tracker's own copy of the game's writer.
 * Each ability's real maximum. The tracker assumes 3, and 4 for Tail
   (`Abilities_SetLevel` only allows 4 for that counter). Confirm against the
   dojo.
