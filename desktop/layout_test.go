@@ -73,6 +73,8 @@ func TestLayoutSVG(t *testing.T) {
 		s := &svgCanvas{}
 		h := draw(s, r, "Live: melonDS.exe (slot 1)", false, wcase.compact, wcase.w)
 		out := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d"><rect width="100%%" height="100%%" fill="%s"/>%s</svg>`, wcase.w, h, col(cBg), s.b.String())
-		os.WriteFile(os.Getenv("SSL_OUT")+"layout_"+wcase.name+".svg", []byte(out), 0644)
+		if o := os.Getenv("SSL_OUT"); o != "" {
+			os.WriteFile(o+"layout_"+wcase.name+".svg", []byte(out), 0644)
+		}
 	}
 }
